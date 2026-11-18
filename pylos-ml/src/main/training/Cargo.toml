@@ -1,0 +1,27 @@
+[package]
+name = "pylos-train"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+cuda = ["burn/cuda"]
+
+[dependencies]
+anyhow = "1.0"
+arrayvec = "0.7"
+burn = { version = "0.22", features = ["wgpu", "extension", "fusion"] }
+burn-cubecl = { version = "0.22.1", default-features = false }
+bytemuck = "1.25"
+bytes = { version = "1.12", default-features = false }
+crossbeam-channel = "0.5"
+mimalloc = "0.1"
+rand = "0.10"
+
+[[example]]
+name = "train_value"
+path = "examples/train_value.rs"
+
+[[example]]
+name = "train_policy"
+path = "examples/train_policy.rs"
