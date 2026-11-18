@@ -239,7 +239,72 @@ public class StudentPlayerMCTS extends PylosPlayer {
         }
         current.visitCount++;
     }
+    // Accumulate sparse Layer 0 weights for all active features in our 162-feature encoding
+    private static void accumulateFeatures(PylosBoard board, PylosPlayerColor perspective, short[] acc, short[] l0Weights, int hiddenSize) {
+        PylosLocation[] locations = board.getLocations();
 
+        // 1. Occupancy (0..59) & Blocked Spheres (60..119)
+        for (PylosLocation loc : locations) {
+            PylosSphere sphere = loc.getSphere();
+            if (sphere != null) {
+                int idx = locationIndex(loc);
+                boolean isOwn = (sphere.PLAYER_COLOR == perspective);
+
+                // Occupancy feature
+                addWeightRow(acc, l0Weights, (isOwn ? 0 : 30) + idx, hiddenSize);
+
+                // Blocked feature (sphere cannot move/be removed because another sphere rests on it)
+                if (!sphere.canMove()) {
+                    addWeightRow(acc, l0Weights, (isOwn ? 60 : 90) + idx, hiddenSize);
+                }
+            }
+        }
+
+        // 2. 2x2 Square Threats (120..147) & Playable Upper Cells (148..161)
+        // Iterate over all 14 upper cells (z = 1..3), each sits directly above a 2x2 square on level z-1
+        int upperIdx = 0; // 0..13
+        for (int z = 1; z <= 3; z++) {
+            int upperWidth = 4 - z;
+            for (int y = 0; y < upperWidth; y++) {
+                for (int x = 0; x < upperWidth; x++) {
+                    // Check the 4 supporting cells on level z - 1
+                    int ownCount = 0;
+                    int oppCount = 0;
+                    for (int dy = 0; dy <= 1; dy++) {
+                        for (int dx = 0; dx <= 1; dx++) {
+                            PylosSphere s = board.getBoardLocation(x + dx, y + dy, z - 1).getSphere();
+                            if (s != null) {
+                                if (s.PLAYER_COLOR == perspective) ownCount++;
+                                else oppCount++;
+                            }
+                        }
+                    }
+
+                    // 3-of-4 threat in the 2x2 square on level z - 1
+                    if (ownCount == 3 && oppCount == 0) {
+                        addWeightRow(acc, l0Weights, 120 + upperIdx, hiddenSize);
+                    } else if (oppCount == 3 && ownCount == 0) {
+                        addWeightRow(acc, l0Weights, 134 + upperIdx, hiddenSize);
+                    }
+
+                    // Upper cell itself is playable (empty + 4 supports present)
+                    PylosLocation upperLoc = board.getBoardLocation(x, y, z);
+                    if (upperLoc.getSphere() == null && (ownCount + oppCount == 4)) {
+                        addWeightRow(acc, l0Weights, 148 + upperIdx, hiddenSize);
+                    }
+
+                    upperIdx++;
+                }
+            }
+        }
+    }
+
+    private static void addWeightRow(short[] acc, short[] l0Weights, int featureIdx, int hiddenSize) {
+        int rowOffset = featureIdx * hiddenSize;
+        for (int h = 0; h < hiddenSize; h++) {
+            acc[h] = (short) (acc[h] + l0Weights[rowOffset + h]);
+        }
+    }
     public void setRecordSearches(boolean recordSearches) {
         this.recordSearches = recordSearches;
     }
@@ -404,19 +469,8 @@ public class StudentPlayerMCTS extends PylosPlayer {
             // 1. Initialize accumulator with l0 biases (scaled by QA = 255)
             short[] acc = Arrays.copyOf(WEIGHTS.l0Bias, HIDDEN_SIZE);
 
-            // 2. Sparse layer 0: add weight row for each active feature (x_i == 1)
-            PylosLocation[] locations = board.getLocations();
-            for (int i = 0; i < locations.length; i++) {
-                PylosSphere sphere = locations[i].getSphere();
-                if (sphere != null) {
-                    // Features 0..29 = perspective's spheres, 30..59 = opponent's spheres
-                    int featureIdx = (sphere.PLAYER_COLOR == perspective) ? i : (30 + i);
-                    int rowOffset = featureIdx * HIDDEN_SIZE;
-                    for (int h = 0; h < HIDDEN_SIZE; h++) {
-                        acc[h] = (short) (acc[h] + WEIGHTS.l0Weights[rowOffset + h]);
-                    }
-                }
-            }
+            // 2. Sparse layer 0: accumulate weights for all active features (0..161)
+            accumulateFeatures(board, perspective, acc, WEIGHTS.l0Weights, HIDDEN_SIZE);
 
             // 3. Clipped ReLU [0, QA] + Layer 1 dot product in int
             int sum = WEIGHTS.l1Bias[0]; // Already scaled by QA * QB
@@ -456,18 +510,8 @@ public class StudentPlayerMCTS extends PylosPlayer {
             // 1. Layer 0: Initialize accumulator with l0 biases (scaled by QA = 255)
             short[] acc = Arrays.copyOf(WEIGHTS.l0Bias, HIDDEN_SIZE);
 
-            // Sparse layer 0: add weight row for each active input feature from `toMove`'s perspective
-            PylosLocation[] locations = board.getLocations();
-            for (int i = 0; i < locations.length; i++) {
-                PylosSphere sphere = locations[i].getSphere();
-                if (sphere != null) {
-                    int featureIdx = (sphere.PLAYER_COLOR == toMove) ? i : (30 + i);
-                    int rowOffset = featureIdx * HIDDEN_SIZE;
-                    for (int h = 0; h < HIDDEN_SIZE; h++) {
-                        acc[h] = (short) (acc[h] + WEIGHTS.l0Weights[rowOffset + h]);
-                    }
-                }
-            }
+            // Sparse layer 0: accumulate weights for all active features (0..161) from `toMove`'s perspective
+            accumulateFeatures(board, toMove, acc, WEIGHTS.l0Weights, HIDDEN_SIZE);
 
             // 2. Clipped ReLU [0, QA]
             short[] activated = new short[HIDDEN_SIZE];
