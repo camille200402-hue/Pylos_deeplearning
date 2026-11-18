@@ -389,14 +389,14 @@ public class StudentPlayerMCTS extends PylosPlayer {
     }
 
     public static final class ValueNetwork implements ValueFunction {
-        public static final int INPUT_SIZE = 60;
+        public static final int INPUT_SIZE = 162;
         public static final int HIDDEN_SIZE = 32;
         public static final int OUTPUT_SIZE = 1;
 
         public static final int QA = 255;
         public static final int QB = 64;
 
-        public static final Path WEIGHTS_PATH = Path.of("value/quantised.bin");
+        public static final Path WEIGHTS_PATH = Path.of("pylos-ml/src/main/training/checkpoints/value-162-32-50/quantised.bin");
         public static final NetworkWeights WEIGHTS = NetworkWeights.loadAtClassInit(WEIGHTS_PATH, INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE);
 
         @Override
@@ -436,14 +436,14 @@ public class StudentPlayerMCTS extends PylosPlayer {
     }
 
     public static final class PolicyNetwork implements PolicyFunction {
-        public static final int INPUT_SIZE = 60;
+        public static final int INPUT_SIZE = 162;
         public static final int HIDDEN_SIZE = 32;
         public static final int OUTPUT_SIZE = 991;
 
         public static final int QA = 255;
         public static final int QB = 64;
 
-        public static final Path WEIGHTS_PATH = Path.of("pylos-ml/src/main/training/checkpoints/policy-60-32-10/quantised.bin");
+        public static final Path WEIGHTS_PATH = Path.of("pylos-ml/src/main/training/checkpoints/policy-162-32-50/quantised.bin");
         public static final NetworkWeights WEIGHTS = NetworkWeights.loadAtClassInit(WEIGHTS_PATH, INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE);
 
         @Override

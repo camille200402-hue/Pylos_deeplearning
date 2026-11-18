@@ -5,7 +5,7 @@ use pylos_train::common::loader::DataLoader;
 use pylos_train::common::{logger, run, save};
 use pylos_train::common::inputs::{BinaryInput, DenseInput, InputsMapper};
 use pylos_train::common::run::{TrainingSchedule, TrainingSteps};
-use pylos_train::features::{InputEncoding, SphereOccupancy};
+use pylos_train::features::{InputEncoding, SphereOccupancy, TacticalEncoding};
 use pylos_train::value::data::ValueSample;
 use pylos_train::value::model::Value;
 
@@ -15,7 +15,7 @@ static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
 // Training configuration.
 const NET_NAME: &str = "value";
 
-type Encoding = SphereOccupancy;
+type Encoding = TacticalEncoding;
 const HIDDEN_SIZE: usize = 32;
 const DATA_PATHS: &[&str] = &["data/run_20261118_152058_567"];
 

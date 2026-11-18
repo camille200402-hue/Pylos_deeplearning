@@ -5,7 +5,7 @@ use pylos_train::common::loader::{DataLoader, NUM_ACTIONS};
 use pylos_train::common::{logger, run, save};
 use pylos_train::common::inputs::{BinaryInput, DenseInput, InputsMapper, SparseInput};
 use pylos_train::common::run::{TrainingSchedule, TrainingSteps};
-use pylos_train::features::{InputEncoding, SphereOccupancy};
+use pylos_train::features::{InputEncoding, SphereOccupancy, TacticalEncoding};
 use pylos_train::policy::data::PolicySample;
 use pylos_train::policy::model::Policy;
 
@@ -15,7 +15,7 @@ static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
 // Training configuration.
 const NET_NAME: &str = "policy";
 
-type Encoding = SphereOccupancy;
+type Encoding = TacticalEncoding;
 const HIDDEN_SIZE: usize = 32;
 const NUM_OUTPUTS: usize = 991;
 const DATA_PATHS: &[&str] = &["data/run_20261118_153150_692"];
