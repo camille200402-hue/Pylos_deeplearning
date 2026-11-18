@@ -443,13 +443,80 @@ public class StudentPlayerMCTS extends PylosPlayer {
         public static final int QA = 255;
         public static final int QB = 64;
 
-        public static final Path WEIGHTS_PATH = Path.of("policy/quantised.bin");
+        public static final Path WEIGHTS_PATH = Path.of("pylos-ml/src/main/training/checkpoints/policy-60-32-10/quantised.bin");
         public static final NetworkWeights WEIGHTS = NetworkWeights.loadAtClassInit(WEIGHTS_PATH, INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE);
 
         @Override
         public double[] priors(PylosBoard board, PylosPlayerColor toMove, List<Action> actions) {
-            // TODO: implement policy network inference
-            return new double[0];
+            int numActions = actions.size();
+            if (numActions == 0) {
+                return new double[0];
+            }
+
+            // 1. Layer 0: Initialize accumulator with l0 biases (scaled by QA = 255)
+            short[] acc = Arrays.copyOf(WEIGHTS.l0Bias, HIDDEN_SIZE);
+
+            // Sparse layer 0: add weight row for each active input feature from `toMove`'s perspective
+            PylosLocation[] locations = board.getLocations();
+            for (int i = 0; i < locations.length; i++) {
+                PylosSphere sphere = locations[i].getSphere();
+                if (sphere != null) {
+                    int featureIdx = (sphere.PLAYER_COLOR == toMove) ? i : (30 + i);
+                    int rowOffset = featureIdx * HIDDEN_SIZE;
+                    for (int h = 0; h < HIDDEN_SIZE; h++) {
+                        acc[h] = (short) (acc[h] + WEIGHTS.l0Weights[rowOffset + h]);
+                    }
+                }
+            }
+
+            // 2. Clipped ReLU [0, QA]
+            short[] activated = new short[HIDDEN_SIZE];
+            for (int h = 0; h < HIDDEN_SIZE; h++) {
+                short val = acc[h];
+                if (val < 0) {
+                    activated[h] = 0;
+                } else if (val > QA) {
+                    activated[h] = QA;
+                } else {
+                    activated[h] = val;
+                }
+            }
+
+            // 3. Layer 1: Compute dequantized logit only for each legal action's actionId
+            double[] logits = new double[numActions];
+            double maxLogit = Double.NEGATIVE_INFINITY;
+            double scale = (double) (QA * QB);
+
+            for (int a = 0; a < numActions; a++) {
+                int actionId = mapActionToActionId(actions.get(a));
+                int weightOffset = actionId * HIDDEN_SIZE;
+
+                int sum = WEIGHTS.l1Bias[actionId];
+                for (int h = 0; h < HIDDEN_SIZE; h++) {
+                    sum += activated[h] * WEIGHTS.l1Weights[weightOffset + h];
+                }
+
+                double logit = sum / scale;
+                logits[a] = logit;
+                if (logit > maxLogit) {
+                    maxLogit = logit;
+                }
+            }
+
+            // 4. Softmax over the legal actions (subtracting maxLogit for numerical stability)
+            double[] priors = new double[numActions];
+            double expSum = 0.0;
+            for (int a = 0; a < numActions; a++) {
+                double expVal = Math.exp(logits[a] - maxLogit);
+                priors[a] = expVal;
+                expSum += expVal;
+            }
+
+            for (int a = 0; a < numActions; a++) {
+                priors[a] /= expSum;
+            }
+
+            return priors;
         }
     }
 
