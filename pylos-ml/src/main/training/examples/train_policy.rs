@@ -17,8 +17,8 @@ const NET_NAME: &str = "policy";
 
 type Encoding = SphereOccupancy;
 const HIDDEN_SIZE: usize = 32;
-const NUM_OUTPUTS: usize = todo!();
-const DATA_PATHS: &[&str] = &["data/directory_name"]; // TODO: point to directory containing training data
+const NUM_OUTPUTS: usize = 991;
+const DATA_PATHS: &[&str] = &["data/run_20261118_153150_692"];
 
 const INPUT_SIZE: usize = Encoding::NUM_FEATURES;
 const SUPERBATCHES: usize = 50;

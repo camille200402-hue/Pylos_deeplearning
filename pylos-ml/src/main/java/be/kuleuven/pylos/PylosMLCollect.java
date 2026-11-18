@@ -26,7 +26,7 @@ public class PylosMLCollect {
     public static final int RANDOM_OPENING_ACTIONS = 6;
     private static final int PROGRESS_INTERVAL_SECONDS = 1;
 
-    static final int GAMES_PER_THREAD = 25_000;
+    static final int GAMES_PER_THREAD = 1000;
     static final int THREADS = Math.max(Runtime.getRuntime().availableProcessors() - 2, 2);
 
     public static void main(String[] args) {

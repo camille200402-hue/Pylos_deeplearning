@@ -17,7 +17,7 @@ const NET_NAME: &str = "value";
 
 type Encoding = SphereOccupancy;
 const HIDDEN_SIZE: usize = 32;
-const DATA_PATHS: &[&str] = &["data/directory_name"]; // TODO: point to directory containing training data
+const DATA_PATHS: &[&str] = &["data/run_20261118_152058_567"];
 
 const INPUT_SIZE: usize = Encoding::NUM_FEATURES;
 const SUPERBATCHES: usize = 50;

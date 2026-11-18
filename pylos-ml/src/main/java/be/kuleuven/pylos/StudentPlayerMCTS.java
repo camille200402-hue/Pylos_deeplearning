@@ -357,9 +357,35 @@ public class StudentPlayerMCTS extends PylosPlayer {
         return visitData;
     }
 
+    private static int locationIndex(PylosLocation loc) {
+        // Level offsets: z=0 -> 0 (16 cells), z=1 -> 16 (9 cells), z=2 -> 25 (4 cells), z=3 -> 29 (1 cell)
+        int levelOffset = switch (loc.Z) {
+            case 0 -> 0;
+            case 1 -> 16;
+            case 2 -> 25;
+            case 3 -> 29;
+            default -> throw new IllegalArgumentException("Invalid Z: " + loc.Z);
+        };
+        int width = 4 - loc.Z;
+        return levelOffset + loc.Y * width + loc.X;
+    }
+
+    /**
+     * Action ID mapping (total = 991):
+     *   0          : PASS
+     *   1 .. 30    : ADD (1 + toIdx)
+     *   31 .. 60   : REMOVE_FIRST (31 + fromIdx)
+     *   61 .. 90   : REMOVE_SECOND (61 + fromIdx)
+     *   91 .. 990  : UPGRADE (91 + fromIdx * 30 + toIdx)
+     */
     private static int mapActionToActionId(Action action) {
-        // TODO: Map every possible action to a dense index
-        return 0;
+        return switch (action.type) {
+            case PASS -> 0;
+            case ADD -> 1 + locationIndex(action.toLocation);
+            case REMOVE_FIRST -> 31 + locationIndex(action.fromLocation);
+            case REMOVE_SECOND -> 61 + locationIndex(action.fromLocation);
+            case UPGRADE -> 91 + locationIndex(action.fromLocation) * 30 + locationIndex(action.toLocation);
+        };
     }
 
     public static final class ValueNetwork implements ValueFunction {
@@ -371,25 +397,54 @@ public class StudentPlayerMCTS extends PylosPlayer {
         public static final int QB = 64;
 
         public static final Path WEIGHTS_PATH = Path.of("value/quantised.bin");
-//        public static final NetworkWeights WEIGHTS = NetworkWeights.loadAtClassInit(WEIGHTS_PATH, INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE);
+        public static final NetworkWeights WEIGHTS = NetworkWeights.loadAtClassInit(WEIGHTS_PATH, INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE);
 
         @Override
         public double evaluate(PylosBoard board, PylosPlayerColor perspective) {
-            // TODO: implement value network inference
-            return 0;
+            // 1. Initialize accumulator with l0 biases (scaled by QA = 255)
+            short[] acc = Arrays.copyOf(WEIGHTS.l0Bias, HIDDEN_SIZE);
+
+            // 2. Sparse layer 0: add weight row for each active feature (x_i == 1)
+            PylosLocation[] locations = board.getLocations();
+            for (int i = 0; i < locations.length; i++) {
+                PylosSphere sphere = locations[i].getSphere();
+                if (sphere != null) {
+                    // Features 0..29 = perspective's spheres, 30..59 = opponent's spheres
+                    int featureIdx = (sphere.PLAYER_COLOR == perspective) ? i : (30 + i);
+                    int rowOffset = featureIdx * HIDDEN_SIZE;
+                    for (int h = 0; h < HIDDEN_SIZE; h++) {
+                        acc[h] = (short) (acc[h] + WEIGHTS.l0Weights[rowOffset + h]);
+                    }
+                }
+            }
+
+            // 3. Clipped ReLU [0, QA] + Layer 1 dot product in int
+            int sum = WEIGHTS.l1Bias[0]; // Already scaled by QA * QB
+            for (int h = 0; h < HIDDEN_SIZE; h++) {
+                short clamped = acc[h];
+                if (clamped < 0) {
+                    clamped = 0;
+                } else if (clamped > QA) {
+                    clamped = QA;
+                }
+                sum += clamped * WEIGHTS.l1Weights[h];
+            }
+
+            // 4. Divide by QA * QB using floating-point division and apply tanh
+            return Math.tanh(sum / (double) (QA * QB));
         }
     }
 
     public static final class PolicyNetwork implements PolicyFunction {
         public static final int INPUT_SIZE = 60;
         public static final int HIDDEN_SIZE = 32;
-        public static final int OUTPUT_SIZE = -1; // TODO: set to output size of policy network
+        public static final int OUTPUT_SIZE = 991;
 
         public static final int QA = 255;
         public static final int QB = 64;
 
         public static final Path WEIGHTS_PATH = Path.of("policy/quantised.bin");
-//        public static final NetworkWeights WEIGHTS = NetworkWeights.loadAtClassInit(WEIGHTS_PATH, INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE);
+        public static final NetworkWeights WEIGHTS = NetworkWeights.loadAtClassInit(WEIGHTS_PATH, INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE);
 
         @Override
         public double[] priors(PylosBoard board, PylosPlayerColor toMove, List<Action> actions) {
