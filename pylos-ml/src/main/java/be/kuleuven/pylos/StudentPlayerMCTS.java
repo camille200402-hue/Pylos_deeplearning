@@ -466,14 +466,15 @@ public class StudentPlayerMCTS extends PylosPlayer {
 
         @Override
         public double evaluate(PylosBoard board, PylosPlayerColor perspective) {
-            // 1. Initialize accumulator with l0 biases (scaled by QA = 255)
+            // done
+            // make array representing first layer with predecided weight
             short[] acc = Arrays.copyOf(WEIGHTS.l0Bias, HIDDEN_SIZE);
 
-            // 2. Sparse layer 0: accumulate weights for all active features (0..161)
+            //multiply by value where 1
             accumulateFeatures(board, perspective, acc, WEIGHTS.l0Weights, HIDDEN_SIZE);
 
-            // 3. Clipped ReLU [0, QA] + Layer 1 dot product in int
-            int sum = WEIGHTS.l1Bias[0]; // Already scaled by QA * QB
+            int sum = WEIGHTS.l1Bias[0]; // add baseline bias
+            // for all nodes cap the value with min and max and add weighted value to sum
             for (int h = 0; h < HIDDEN_SIZE; h++) {
                 short clamped = acc[h];
                 if (clamped < 0) {
@@ -484,7 +485,7 @@ public class StudentPlayerMCTS extends PylosPlayer {
                 sum += clamped * WEIGHTS.l1Weights[h];
             }
 
-            // 4. Divide by QA * QB using floating-point division and apply tanh
+            // make scale from -1 to 1
             return Math.tanh(sum / (double) (QA * QB));
         }
     }
