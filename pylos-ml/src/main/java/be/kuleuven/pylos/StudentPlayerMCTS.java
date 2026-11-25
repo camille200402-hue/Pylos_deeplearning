@@ -508,13 +508,13 @@ public class StudentPlayerMCTS extends PylosPlayer {
                 return new double[0];
             }
 
-            // 1. Layer 0: Initialize accumulator with l0 biases (scaled by QA = 255)
+            // initilaze array with nodesweights
             short[] acc = Arrays.copyOf(WEIGHTS.l0Bias, HIDDEN_SIZE);
 
-            // Sparse layer 0: accumulate weights for all active features (0..161) from `toMove`'s perspective
+            // look at weights other then 0
             accumulateFeatures(board, toMove, acc, WEIGHTS.l0Weights, HIDDEN_SIZE);
 
-            // 2. Clipped ReLU [0, QA]
+            // cap value
             short[] activated = new short[HIDDEN_SIZE];
             for (int h = 0; h < HIDDEN_SIZE; h++) {
                 short val = acc[h];
@@ -527,20 +527,24 @@ public class StudentPlayerMCTS extends PylosPlayer {
                 }
             }
 
-            // 3. Layer 1: Compute dequantized logit only for each legal action's actionId
-            double[] logits = new double[numActions];
-            double maxLogit = Double.NEGATIVE_INFINITY;
-            double scale = (double) (QA * QB);
 
+            double[] logits = new double[numActions]; // store score of each move
+            double maxLogit = Double.NEGATIVE_INFINITY; // track highest score until then
+            double scale = (double) (QA * QB); //scaling
+
+            // loop each legal action
             for (int a = 0; a < numActions; a++) {
+                // get action
                 int actionId = mapActionToActionId(actions.get(a));
+                // jump to right index
                 int weightOffset = actionId * HIDDEN_SIZE;
-
+                // add starting bias
                 int sum = WEIGHTS.l1Bias[actionId];
+                // add to score
                 for (int h = 0; h < HIDDEN_SIZE; h++) {
                     sum += activated[h] * WEIGHTS.l1Weights[weightOffset + h];
                 }
-
+                // scale it and get best move
                 double logit = sum / scale;
                 logits[a] = logit;
                 if (logit > maxLogit) {
@@ -548,15 +552,15 @@ public class StudentPlayerMCTS extends PylosPlayer {
                 }
             }
 
-            // 4. Softmax over the legal actions (subtracting maxLogit for numerical stability)
+            //makes scores into probabilities
             double[] priors = new double[numActions];
             double expSum = 0.0;
             for (int a = 0; a < numActions; a++) {
-                double expVal = Math.exp(logits[a] - maxLogit);
+                double expVal = Math.exp(logits[a] - maxLogit); // no negatives and higher numbers stand out and - max to keep between 0 and 1
                 priors[a] = expVal;
                 expSum += expVal;
             }
-
+            // normalize
             for (int a = 0; a < numActions; a++) {
                 priors[a] /= expSum;
             }
