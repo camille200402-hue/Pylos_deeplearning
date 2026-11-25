@@ -240,6 +240,7 @@ public class StudentPlayerMCTS extends PylosPlayer {
         current.visitCount++;
     }
     // Accumulate sparse Layer 0 weights for all active features in our 162-feature encoding
+    //TODO only 1 of 2 weights on
     private static void accumulateFeatures(PylosBoard board, PylosPlayerColor perspective, short[] acc, short[] l0Weights, int hiddenSize) {
         PylosLocation[] locations = board.getLocations();
 
@@ -478,6 +479,7 @@ public class StudentPlayerMCTS extends PylosPlayer {
             for (int h = 0; h < HIDDEN_SIZE; h++) {
                 short clamped = acc[h];
                 if (clamped < 0) {
+
                     clamped = 0;
                 } else if (clamped > QA) {
                     clamped = QA;
@@ -491,7 +493,7 @@ public class StudentPlayerMCTS extends PylosPlayer {
     }
 
     public static final class PolicyNetwork implements PolicyFunction {
-        public static final int INPUT_SIZE = 162;
+        public static final int INPUT_SIZE = 120;
         public static final int HIDDEN_SIZE = 32;
         public static final int OUTPUT_SIZE = 991;
 
